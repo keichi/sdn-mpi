@@ -7,6 +7,10 @@ class Integer
     [self >> 32 & 0xffffffff, self & 0xffffffff].pack('N*')
   end
 
+  def uint48_to_s
+    [self >> 32 & 0xff, self & 0xffffffff].pack('nN')
+  end
+
   def to_dpid_s
     [self >> 32 & 0xffffffff, self & 0xffffffff].pack('NN').unpack('C8').join(':')
   end

@@ -140,7 +140,7 @@ class TopologyFinder < Controller
         :src_mac  =>  mac,
         :dst_mac  =>  request.src_hardware_address.binary_s_to_i,
         :opcode   =>  2,
-        :src_hardware_address =>  mac.uint64_to_s,
+        :src_hardware_address =>  mac.uint48_to_s,
         :src_protocol_address =>  request.dst_protocol_address,
         :dst_hardware_address =>  request.src_hardware_address,
         :dst_protocol_address =>  request.src_protocol_address,
