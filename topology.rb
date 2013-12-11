@@ -124,6 +124,22 @@ class Topology
     end
   end
 
+  def get_route_info(route)
+    info = []
+
+    route.each_with_index do |node, i|
+      next unless node.switch?
+
+      node_info = {}
+      node_info[:id] = node.id
+      node_info[:in_port] = node.ports.key route[i - 1].id
+      node_info[:out_port] = node.ports.key route[i + 1].id
+      info.push node_info
+    end
+
+    info
+  end
+
   def route(src_id, dst_id)
     # 33:33:0:0:0:xx is used for IP v6 neighbor discovery
     return unless @nodes.key? src_id and @nodes.key? dst_id
@@ -136,7 +152,7 @@ class Topology
       route.push base
     end
 
-    route
+    route.reverse
   end
 
   def cost(nid, sid)

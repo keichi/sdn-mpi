@@ -16,12 +16,12 @@ class TopologyFinder < Controller
 
   def tick_arp_table
     @arp_table.tick
-    @arp_table.dump
+    # @arp_table.dump
   end
 
   def tick_topology
     @topology.tick
-    @topology.dump
+    # @topology.dump
   end
 
   def switch_ready datapath_id
@@ -56,12 +56,43 @@ class TopologyFinder < Controller
       return
     end
 
-    if message.macsa and message.macda
-      src_mac = message.macsa.to_i
-      dst_mac = message.macda.to_i
+    install_new_route datapath_id, message
+  end
 
-      route = @topology.route src_mac, dst_mac
-      p route.map{|node| node.id.to_mac_s} if route
+  def install_new_route datapath_id, message
+    return unless message.macsa and message.macda
+
+    src_mac = message.macsa.to_i
+    dst_mac = message.macda.to_i
+
+    route = @topology.route src_mac, dst_mac
+    if route.nil?
+      puts "No route from #{message.macsa} to #{message.macda}"
+      return
+    end
+
+    route_info = @topology.get_route_info route
+    puts "Adding flow entry for from #{message.macsa} <-> #{message.macda}"
+    route_info.each do |info|
+      # Add flow entry
+      send_flow_mod_add(
+        info[:id],
+        :match => Match.new(
+          :in_port => info[:in_port],
+          :dl_src => message.macsa,
+          :dl_dst => message.macda,
+        ),
+        :actions => ActionOutput.new(info[:out_port])
+      )
+      send_flow_mod_add(
+        info[:id],
+        :match => Match.new(
+          :in_port => info[:out_port],
+          :dl_src => message.macda,
+          :dl_dst => message.macsa,
+        ),
+        :actions => ActionOutput.new(info[:in_port])
+      )
     end
   end
 
