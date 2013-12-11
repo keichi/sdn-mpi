@@ -38,6 +38,7 @@ class TopologyFinder < Controller
     }.collect {|each|
       each.number
     }
+    ports -= [65534]
 
     @topology.update_node :switch, datapath_id, ports
   end

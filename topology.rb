@@ -114,6 +114,8 @@ class Topology
     
     puts "[Topology::dump::links]"
     @links.each do |l|
+      next unless @nodes.key? l.src_id and @nodes.key? l.dst_id
+
       src_id = @nodes[l.src_id].host? ? l.src_id.to_mac_s : l.src_id.to_dpid_s
       dst_id = @nodes[l.dst_id].host? ? l.dst_id.to_mac_s : l.dst_id.to_dpid_s
 
