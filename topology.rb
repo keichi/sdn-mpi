@@ -127,7 +127,6 @@ class Topology
   def route(src_id, dst_id)
     # 33:33:0:0:0:xx is used for IP v6 neighbor discovery
     return unless @nodes.key? src_id and @nodes.key? dst_id
-    puts "routing #{src_id.to_mac_s} to #{dst_id.to_mac_s}"
 
     dijkstra src_id
     base = @nodes[dst_id]

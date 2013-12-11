@@ -8,7 +8,7 @@ class Integer
   end
 
   def uint48_to_s
-    [self >> 32 & 0xff, self & 0xffffffff].pack('nN')
+    [self >> 32 & 0xffff, self & 0xffffffff].pack('nN')
   end
 
   def to_dpid_s
