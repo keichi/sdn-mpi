@@ -56,6 +56,10 @@ class TopologyFinder < Controller
       return
     end
 
+    # Ad hoc.
+    # Drop IPv6 multicast packets
+    return if message.macda.to_s.start_with? '33:33:'
+
     install_new_route datapath_id, message
   end
 
@@ -72,7 +76,7 @@ class TopologyFinder < Controller
     end
 
     route_info = @topology.get_route_info route
-    puts "Adding flow entry for from #{message.macsa} <-> #{message.macda}"
+    puts "Adding flow entry for #{message.macsa} <-> #{message.macda}"
     route_info.each do |info|
       # Add flow entry
       send_flow_mod_add(
