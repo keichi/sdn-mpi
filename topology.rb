@@ -73,7 +73,7 @@ class Topology
     @ttl = ttl
   end
 
-  def remove_node(id, ports)
+  def remove_node(id)
     @nodes.delete id
   end
 
