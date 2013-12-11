@@ -109,16 +109,16 @@ class Topology
     puts "[Topology::dump]"
     puts "[Topology::dump::nodes]"
     @nodes.each do |id, node|
-      puts "#{id.to_mac_s}: #{node.ports.keys.map{|p| p.to_uint16}}"
+      puts "#{node.host? ? id.to_mac_s : id.to_dpid_s}: #{node.ports.keys}"
     end
     
     puts "[Topology::dump::links]"
     @links.each do |l|
-      src_id = l.src_id.to_mac_s
-      dst_id = l.dst_id.to_mac_s
+      src_id = @nodes[l.src_id].host? ? l.src_id.to_mac_s : l.src_id.to_dpid_s
+      dst_id = @nodes[l.dst_id].host? ? l.dst_id.to_mac_s : l.dst_id.to_dpid_s
 
-      src_port = l.src_port.to_uint16
-      dst_port = l.dst_port.to_uint16
+      src_port = l.src_port
+      dst_port = l.dst_port
 
       puts "#{src_id}(#{src_port}) -> #{dst_id}(#{dst_port})"
     end
@@ -127,7 +127,6 @@ class Topology
   def route(src_id, dst_id)
     # 33:33:0:0:0:xx is used for IP v6 neighbor discovery
     return unless @nodes.key? src_id and @nodes.key? dst_id
-    puts "routing #{src_id.to_mac_s} to #{dst_id.to_mac_s}"
 
     dijkstra src_id
     base = @nodes[dst_id]

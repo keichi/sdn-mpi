@@ -9,17 +9,6 @@ class TopologyFinder < Controller
   periodic_timer_event :tick_arp_table, 1
   periodic_timer_event :tick_topology, 1
 
-  oneshot_timer_event :try_dijkstra, 3
-
-  def try_dijkstra
-    src = @arp_table.resolve_ip "192.168.0.1".ip_to_binary_s
-    dst = @arp_table.resolve_ip "192.168.0.4".ip_to_binary_s
-
-    route = @topology.route(src, dst)
-
-    p route.map{|node| node.id.to_mac_s} if route
-  end
-
   def start
     @arp_table = ArpTable.new 5
     @topology = Topology.new 5
@@ -50,9 +39,6 @@ class TopologyFinder < Controller
       each.number
     }
 
-    datapath_id = datapath_id.uint64_to_s
-    ports = ports.map {|p| p.uint16_to_s}
-
     @topology.update_node :switch, datapath_id, ports
   end
 
@@ -71,8 +57,8 @@ class TopologyFinder < Controller
     end
 
     if message.macsa and message.macda
-      src_mac = message.macsa.to_a.pack('C*')
-      dst_mac = message.macda.to_a.pack('C*')
+      src_mac = message.macsa.to_i
+      dst_mac = message.macda.to_i
 
       route = @topology.route src_mac, dst_mac
       p route.map{|node| node.id.to_mac_s} if route
@@ -87,9 +73,9 @@ class TopologyFinder < Controller
         packet = get_lldp_packet datapath_id, port
 
         send_packet_out(
-          datapath_id.unpack_i,
+          datapath_id,
           :data => packet,
-          :actions => SendOutPort.new(port.to_uint16)
+          :actions => SendOutPort.new(port)
         )
       }
     }
@@ -103,14 +89,14 @@ class TopologyFinder < Controller
         :tlv_type => 1,
         :tlv_value => ChassisID.new(
           :subtype => 7,
-          :id => datapath_id
+          :id => datapath_id.uint64_to_s
         )
       ),
       TLV.new(
         :tlv_type => 2,
         :tlv_value => PortID.new(
           :subtype => 7,
-          :id => port
+          :id => port.uint16_to_s
         )
       ),
       TLV.new(
@@ -125,21 +111,21 @@ class TopologyFinder < Controller
 
   def analyze_lldp_packet datapath_id, message
     packet = LLDP.read message.data
-    dst_id = datapath_id.uint64_to_s
-    dst_port = message.in_port.uint16_to_s
+    dst_id = datapath_id
+    dst_port = message.in_port
 
     # if this packet is from a host
     if packet.chassis_id.subtype == 4
-      src_mac = packet.chassis_id.id
-      src_ip = packet.management_address.address
+      src_mac = packet.chassis_id.id.binary_s_to_i
+      src_ip = packet.management_address.address.binary_s_to_i
 
       @arp_table.update src_ip, src_mac
       # Bi-directional
-      @topology.update_link :host, src_mac, 0.uint16_to_s, dst_id, dst_port
-      @topology.update_link :switch, dst_id, dst_port, src_mac, 0.uint16_to_s
+      @topology.update_link :host, src_mac, 0, dst_id, dst_port
+      @topology.update_link :switch, dst_id, dst_port, src_mac, 0
     else
-      src_id = packet.chassis_id.id
-      src_port = packet.port_id.id
+      src_id = packet.chassis_id.id.binary_s_to_i
+      src_port = packet.port_id.id.to_uint16
 
       @topology.update_link :switch, src_id, src_port, dst_id, dst_port
     end
@@ -147,24 +133,23 @@ class TopologyFinder < Controller
 
   def send_arp_reply datapath_id, message
     request = ARP.read message.data
-    mac = @arp_table.resolve_ip request.dst_protocol_address
-    if mac
-      #puts "ARP Reply: #{request.dst_protocol_address.unpack('C*').join('.')} -> #{mac.unpack('C*').map{|c| c.to_s(16)}.join(':')}"
+    mac = @arp_table.resolve_ip request.dst_protocol_address.binary_s_to_i
 
+    if mac
       reply = ARP.new(
-        :src_mac  =>  mac.unpack_i,
-        :dst_mac  =>  request.src_hardware_address.unpack_i,
+        :src_mac  =>  mac,
+        :dst_mac  =>  request.src_hardware_address.binary_s_to_i,
         :opcode   =>  2,
-        :src_hardware_address =>  mac,
+        :src_hardware_address =>  mac.uint48_to_s,
         :src_protocol_address =>  request.dst_protocol_address,
         :dst_hardware_address =>  request.src_hardware_address,
         :dst_protocol_address =>  request.src_protocol_address,
       )
 
       send_packet_out(
-          datapath_id,
-          :data => reply.to_binary_s,
-          :actions => SendOutPort.new(message.in_port)
+        datapath_id,
+        :data => reply.to_binary_s,
+        :actions => SendOutPort.new(message.in_port)
       )
     end
   end
