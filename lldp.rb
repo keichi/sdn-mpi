@@ -98,6 +98,12 @@ class TopologyFinder < Controller
         :actions => ActionOutput.new(info[:in_port])
       )
     end
+
+    send_packet_out(
+      route_info.last[:id],
+      :data => message.data,
+      :actions => SendOutPort.new(route_info.last[:out_port])
+    )
   end
 
   def flood_lldp_packets
