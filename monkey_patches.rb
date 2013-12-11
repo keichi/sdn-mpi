@@ -6,26 +6,26 @@ class Integer
   def uint64_to_s
     [self >> 32 & 0xffffffff, self & 0xffffffff].pack('N*')
   end
-end
 
-class String
+  def to_dpid_s
+    [self >> 32 & 0xffffffff, self & 0xffffffff].pack('NN').unpack('C8').join(':')
+  end
+
   def to_mac_s
-    self.unpack('C*').map{|c| c.to_s(16)}.join(':')
+    sprintf('%012x', self).unpack('a2' * 6).join(':')
   end
 
   def to_ip_s
-    self.unpack('C*').join('.')
+    [self].pack('N').unpack('C4').join('.')
   end
+end
 
-  def ip_to_binary_s
-    self.split('.').map{|x| x.to_i}.pack('C*')
-  end
-
+class String
   def to_uint16
     self.unpack('S')[0]
   end
 
-  def unpack_i
+  def binary_s_to_i
     self.unpack('C*').reduce(0) {|val, c| (val << 8 | c)}
   end
 end
