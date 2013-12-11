@@ -4,15 +4,15 @@ class Integer
   end
 
   def uint64_to_s
-    [self >> 32 & 0xffffffff, self & 0xffffffff].pack('N*')
+    [self >> 32 & ((1 << 32) - 1), self & ((1 << 32) - 1)].pack('N*')
   end
 
   def uint48_to_s
-    [self >> 32 & 0xffff, self & 0xffffffff].pack('nN')
+    [self >> 32 & ((1 << 16) - 1), self & ((1 << 32) - 1)].pack('nN')
   end
 
   def to_dpid_s
-    [self >> 32 & 0xffffffff, self & 0xffffffff].pack('NN').unpack('C8').join(':')
+    [self >> 32 & ((1 << 32) - 1), self & ((1 << 32) - 1)].pack('NN').unpack('C8').join(':')
   end
 
   def to_mac_s
