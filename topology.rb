@@ -146,6 +146,9 @@ class Topology
     return unless @nodes.key? src_id and @nodes.key? dst_id
 
     dijkstra src_id
+
+    return if @nodes[src_id].cost.nil? or @nodes[dst_id].cost.nil?
+
     base = @nodes[dst_id]
     route = [base]
 
@@ -182,6 +185,9 @@ class Topology
 
       done_node.done = true
       done_node.ports.values.each do |nid|
+        # if nothing is connected to this port
+        next if nid.nil?
+
         to = @nodes[nid]
         cost = done_node.cost + 1
         from = done_node.id
