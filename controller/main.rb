@@ -4,7 +4,7 @@ require 'arp_parser'
 require 'arp_table'
 require 'topology'
 
-class TopologyFinder < Controller
+class SDNMPIController < Controller
   periodic_timer_event :flood_lldp_packets, 1
   periodic_timer_event :tick_arp_table, 1
   periodic_timer_event :tick_topology, 1
