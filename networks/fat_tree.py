@@ -40,7 +40,7 @@ def perfTest():
     dumpNodeConnections(net.hosts)
 
     for host in net.hosts:
-        host.cmdPrint('/vagrant_sync/tiny-lldpd/tlldpd -d -i 1')
+        host.cmdPrint('../../tiny-lldpd/tlldpd -d -i 1')
 
     net.pingAll()
 
