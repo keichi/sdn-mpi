@@ -16,12 +16,12 @@ class TopologyFinder < Controller
 
   def tick_arp_table
     @arp_table.tick
-    # @arp_table.dump
+    @arp_table.dump
   end
 
   def tick_topology
     @topology.tick
-    # @topology.dump
+    @topology.dump
   end
 
   def switch_ready datapath_id
@@ -77,7 +77,7 @@ class TopologyFinder < Controller
     end
 
     route_info = @topology.get_route_info route
-    puts "Adding flow entry for #{message.macsa} <-> #{message.macda}"
+    puts "Flow add #{message.macsa} <-> #{message.macda} (#{message.eth_type.to_hex})"
     route_info.each do |info|
       # Add flow entry
       send_flow_mod_add(
@@ -86,6 +86,7 @@ class TopologyFinder < Controller
           :in_port => info[:in_port],
           :dl_src => message.macsa,
           :dl_dst => message.macda,
+          :dl_type => message.eth_type
         ),
         :actions => ActionOutput.new(info[:out_port])
       )
@@ -95,6 +96,7 @@ class TopologyFinder < Controller
           :in_port => info[:out_port],
           :dl_src => message.macda,
           :dl_dst => message.macsa,
+          :dl_type => message.eth_type
         ),
         :actions => ActionOutput.new(info[:in_port])
       )
