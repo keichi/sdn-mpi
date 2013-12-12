@@ -8,6 +8,7 @@ from mininet.util import dumpNodeConnections
 from mininet.log import setLogLevel
 from mininet.cli import CLI
 from mininet.clean import cleanup
+from time import sleep
 
 class TestTopo(Topo):
     def __init__(self, **opts):
@@ -41,6 +42,8 @@ def perfTest():
 
     for host in net.hosts:
         host.cmdPrint('../../tiny-lldpd/tlldpd -d -i 1')
+
+    sleep(3)
 
     net.pingAll()
 
