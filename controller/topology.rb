@@ -5,6 +5,8 @@ class Link
   attr_reader :dst_id
   attr_reader :src_port
   attr_reader :dst_port
+  attr_reader :tx_speed
+  attr_reader :rx_speed
 
   def initialize(src_id, src_port, dst_id, dst_port)
     @last_updated = Time.now
@@ -12,10 +14,25 @@ class Link
     @src_port = src_port
     @dst_id = dst_id
     @dst_port = dst_port
+    @last_stats_updated = Time.now
+    @tx_bytes = 0
+    @rx_bytes = 0
+    @tx_speed = 0.0
+    @rx_speed = 0.0
   end
 
   def update
     @last_updated = Time.now
+  end
+
+  def update_stats stats
+    time_span = Time.now - @last_stats_updated
+    @tx_speed = (stats.tx_bytes - @tx_bytes) / time_span * 8 / (1000 * 1000)
+    @rx_speed = (stats.rx_bytes - @rx_bytes) / time_span * 8 / (1000 * 1000)
+
+    @last_stats_updated = Time.now
+    @tx_bytes = stats.tx_bytes
+    @rx_bytes = stats.rx_bytes
   end
 
   def timed_out?(ttl)
@@ -100,6 +117,13 @@ class Topology
     @nodes[src_id].update src_port, dst_id
   end
 
+  def update_link_stats datapath_id, port, port_stats
+    return if not @nodes.key? datapath_id or @nodes[datapath_id].ports[port].nil?
+  
+    link = @links.find {|l| l.src_id == datapath_id and l.src_port == port }
+    link.update_stats port_stats if link
+  end
+
   def tick
     @links.delete_if {|link| link.timed_out? @ttl}
     @nodes.delete_if {|id, node| node.timed_out? @ttl}
@@ -121,8 +145,10 @@ class Topology
 
       src_port = l.src_port
       dst_port = l.dst_port
+      tx_speed = sprintf"%.2f", l.tx_speed
+      rx_speed = sprintf"%.2f", l.rx_speed
 
-      puts "#{src_id}(#{src_port}) -> #{dst_id}(#{dst_port})"
+      puts "#{src_id}(#{src_port}) -> #{dst_id}(#{dst_port}) (#{tx_speed}, #{rx_speed})"
     end
   end
 
