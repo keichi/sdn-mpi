@@ -212,7 +212,7 @@ class Topology
       done_node.done = true
       done_node.ports.values.each do |nid|
         # if nothing is connected to this port
-        next if nid.nil?
+        next if nid.nil? or not @nodes.key? nid
 
         to = @nodes[nid]
         cost = done_node.cost + 1
