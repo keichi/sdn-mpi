@@ -214,7 +214,7 @@ class Topology
         next if link.nil? or not @nodes.key? link.dst_id
 
         to = @nodes[link.dst_id]
-        cost = done_node.cost + 1
+        cost = done_node.cost + (1 + link.tx_speed / 1024.0 + link.rx_speed / 1024.0)
         from = done_node.id
 
         if to.cost.nil? or cost < to.cost
