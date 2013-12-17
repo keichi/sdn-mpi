@@ -27,8 +27,8 @@ class Link
 
   def update_stats stats
     time_span = Time.now - @last_stats_updated
-    @tx_speed = (stats.tx_bytes - @tx_bytes) / time_span * 8 / (1000 * 1000)
-    @rx_speed = (stats.rx_bytes - @rx_bytes) / time_span * 8 / (1000 * 1000)
+    @tx_speed = (stats.tx_bytes - @tx_bytes) / time_span * 8 / (1024 * 1024)
+    @rx_speed = (stats.rx_bytes - @rx_bytes) / time_span * 8 / (1024 * 1024)
 
     @last_stats_updated = Time.now
     @tx_bytes = stats.tx_bytes
