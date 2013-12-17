@@ -23,15 +23,15 @@ class TestTopo(Topo):
         h3 = self.addHost('h3')
         h4 = self.addHost('h4')
 
-        self.addLink(s1, h1)
-        self.addLink(s1, h2)
-        self.addLink(s2, h3)
-        self.addLink(s2, h4)
+        self.addLink(s1, h1, bw=1000)
+        self.addLink(s1, h2, bw=1000)
+        self.addLink(s2, h3, bw=1000)
+        self.addLink(s2, h4, bw=1000)
 
-        self.addLink(s1, s3)
-        self.addLink(s1, s4)
-        self.addLink(s2, s3)
-        self.addLink(s2, s4)
+        self.addLink(s1, s3, bw=1000)
+        self.addLink(s1, s4, bw=1000)
+        self.addLink(s2, s3, bw=1000)
+        self.addLink(s2, s4, bw=1000)
 
 def runMPI():
     # Create network
