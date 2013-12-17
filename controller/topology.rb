@@ -52,7 +52,7 @@ class Node
     @type = type
     @id = id
     # key: Port number
-    # value: Node id (nil if nothing is connected)
+    # value: Link object (nil if nothing is connected)
     @ports = {}
     ports.each {|port| @ports[port] = nil}
     @from = nil
@@ -72,12 +72,8 @@ class Node
     Time.now - @last_updated > ttl
   end
 
-  def update(src_port=nil, dst_id=nil)
+  def update
     @last_updated = Time.now
-
-    if src_port and dst_id
-      @ports[src_port] = dst_id
-    end
   end
 end
 
@@ -86,7 +82,6 @@ class Topology
 
   def initialize ttl
     @nodes = {}
-    @links = []
     @ttl = ttl
   end
 
@@ -103,52 +98,56 @@ class Topology
   end
 
   def update_link(src_type, src_id, src_port, dst_id, dst_port)
-    link = @links.find do |l|
-      (l.src_id == src_id) && (l.dst_id == dst_id) && (l.src_port == src_port) && (l.dst_port == dst_port)
+    update_node src_type, src_id, {}
+    if @nodes.key? src_id and @nodes[src_id].ports.key? src_port
+      link = @nodes[src_id].ports[src_port]
     end
 
     if link
       link.update
     else
-      @links.push Link.new src_id, src_port, dst_id, dst_port
+      @nodes[src_id].ports[src_port] = Link.new src_id, src_port, dst_id, dst_port
     end
-
-    update_node src_type, src_id, {}
-    @nodes[src_id].update src_port, dst_id
   end
 
   def update_link_stats datapath_id, port, port_stats
     return if not @nodes.key? datapath_id or @nodes[datapath_id].ports[port].nil?
   
-    link = @links.find {|l| l.src_id == datapath_id and l.src_port == port }
-    link.update_stats port_stats if link
+    link = @nodes[datapath_id].ports[port]
+    link.update_stats port_stats
   end
 
   def tick
-    @links.delete_if {|link| link.timed_out? @ttl}
     @nodes.delete_if {|id, node| node.timed_out? @ttl}
+    @nodes.each do |id, node|
+      node.ports.delete_if do |port, link|
+        link.timed_out? @ttl if link
+      end
+    end
   end
 
   def dump
     puts "[Topology::dump]"
     puts "[Topology::dump::nodes]"
     @nodes.each do |id, node|
-      puts "#{node.host? ? id.to_mac_s : id.to_dpid_s}: #{node.ports.keys}"
+      puts "#{node.host? ? 'Host' : 'Switch'} #{node.host? ? id.to_mac_s : id.to_dpid_s} #{node.ports.keys}"
     end
     
     puts "[Topology::dump::links]"
-    @links.each do |l|
-      next unless @nodes.key? l.src_id and @nodes.key? l.dst_id
+    @nodes.each do |id, node|
+      node.ports.each do |port, l|
+        next unless l and @nodes.key? l.src_id and @nodes.key? l.dst_id
 
-      src_id = @nodes[l.src_id].host? ? l.src_id.to_mac_s : l.src_id.to_dpid_s
-      dst_id = @nodes[l.dst_id].host? ? l.dst_id.to_mac_s : l.dst_id.to_dpid_s
+        src_id = @nodes[l.src_id].host? ? l.src_id.to_mac_s : l.src_id.to_dpid_s
+        dst_id = @nodes[l.dst_id].host? ? l.dst_id.to_mac_s : l.dst_id.to_dpid_s
 
-      src_port = l.src_port
-      dst_port = l.dst_port
-      tx_speed = sprintf"%.2f", l.tx_speed
-      rx_speed = sprintf"%.2f", l.rx_speed
+        src_port = l.src_port
+        dst_port = l.dst_port
+        tx_speed = sprintf"%.2f", l.tx_speed
+        rx_speed = sprintf"%.2f", l.rx_speed
 
-      puts "#{src_id}(#{src_port}) -> #{dst_id}(#{dst_port}) (#{tx_speed}, #{rx_speed})"
+        puts "#{src_id}(#{src_port}) -> #{dst_id}(#{dst_port}) (#{tx_speed}, #{rx_speed})"
+      end
     end
   end
 
@@ -160,8 +159,8 @@ class Topology
 
       node_info = {}
       node_info[:id] = node.id
-      node_info[:in_port] = node.ports.key route[i - 1].id
-      node_info[:out_port] = node.ports.key route[i + 1].id
+      node_info[:in_port] = node.ports.find {|p, l| l.dst_id == route[i - 1].id}[0]
+      node_info[:out_port] = node.ports.find {|p, l| l.dst_id == route[i + 1].id}[0]
       info.push node_info
     end
 
@@ -210,11 +209,11 @@ class Topology
       break unless done_node
 
       done_node.done = true
-      done_node.ports.values.each do |nid|
+      done_node.ports.each do |port, link|
         # if nothing is connected to this port
-        next if nid.nil? or not @nodes.key? nid
+        next if link.nil? or not @nodes.key? link.dst_id
 
-        to = @nodes[nid]
+        to = @nodes[link.dst_id]
         cost = done_node.cost + 1
         from = done_node.id
 
