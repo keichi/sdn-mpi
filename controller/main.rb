@@ -8,7 +8,7 @@ class SDNMPIController < Controller
   periodic_timer_event :flood_lldp_packets, 1
   periodic_timer_event :tick_arp_table, 1
   periodic_timer_event :tick_topology, 1
-  periodic_timer_event :send_port_stats, 1
+  periodic_timer_event :request_port_stats, 1
 
   def start
     @arp_table = ArpTable.new 5
@@ -25,7 +25,7 @@ class SDNMPIController < Controller
     @topology.dump
   end
 
-  def send_port_stats
+  def request_port_stats
     @topology.nodes.each do |id, node|
       node.ports.keys.each do |port|
         send_message node.id, PortStatsRequest.new(:port_no=>port)
