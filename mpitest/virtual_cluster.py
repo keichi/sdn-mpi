@@ -3,9 +3,10 @@
 from mininet.topo import Topo
 from mininet.net import Mininet
 from mininet.link import TCLink
-from mininet.node import RemoteController, OVSController
+from mininet.node import RemoteController
 from mininet.util import dumpNodeConnections
 from mininet.log import setLogLevel
+from mininet.clean import cleanup
 from time import sleep
 
 class TestTopo(Topo):
@@ -79,7 +80,10 @@ def runMPI():
     print "----------------------------------------"
     print "MPI application finished."
 
+    net.hosts[0].cmdPrint('sudo killall tlldpd')
+
     net.stop()
+    cleanup()
 
 if __name__ == '__main__':
     setLogLevel('info')
