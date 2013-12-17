@@ -18,8 +18,6 @@ int main(int argc,char *argv[])
 
     float start_time = (float)clock() / CLOCKS_PER_SEC;
 
-    printf("Hello, world from node: %d!\n", rank);
-
     int count = sizeof(outmsg) / sizeof(char);
 
     for (i = 0; i < 5; i++) {
