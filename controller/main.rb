@@ -103,7 +103,9 @@ class SDNMPIController < Controller
           :dl_type => message.eth_type,
           :nw_proto => message.ipv4_protocol
         ),
-        :actions => ActionOutput.new(info[:out_port])
+        :actions => ActionOutput.new(info[:out_port]),
+        :idle_timeout => 0,
+        :hard_timeout => 0
       )
       send_flow_mod_add(
         info[:id],
@@ -114,7 +116,9 @@ class SDNMPIController < Controller
           :dl_type => message.eth_type,
           :nw_proto => message.ipv4_protocol
         ),
-        :actions => ActionOutput.new(info[:in_port])
+        :actions => ActionOutput.new(info[:in_port]),
+        :idle_timeout => 0,
+        :hard_timeout => 0
       )
     end
 
