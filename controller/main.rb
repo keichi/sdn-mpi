@@ -8,7 +8,7 @@ class SDNMPIController < Controller
   periodic_timer_event :flood_lldp_packets, 1
   periodic_timer_event :tick_arp_table, 1
   periodic_timer_event :tick_topology, 1
-  periodic_timer_event :request_port_stats, 1
+  periodic_timer_event :request_port_stats, 0.2
 
   def start
     @arp_table = ArpTable.new 5
@@ -100,7 +100,8 @@ class SDNMPIController < Controller
           :in_port => info[:in_port],
           :dl_src => message.macsa,
           :dl_dst => message.macda,
-          :dl_type => message.eth_type
+          :dl_type => message.eth_type,
+          :nw_proto => message.ipv4_protocol
         ),
         :actions => ActionOutput.new(info[:out_port])
       )
@@ -110,7 +111,8 @@ class SDNMPIController < Controller
           :in_port => info[:out_port],
           :dl_src => message.macda,
           :dl_dst => message.macsa,
-          :dl_type => message.eth_type
+          :dl_type => message.eth_type,
+          :nw_proto => message.ipv4_protocol
         ),
         :actions => ActionOutput.new(info[:in_port])
       )
