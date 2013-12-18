@@ -40,11 +40,8 @@ def runMPI():
     # net = Mininet(topo=topo, controller=OVSController, link=TCLink)
     net.start()
 
-    print "Dumping host connections"
-    dumpNodeConnections(net.hosts)
-
     for host in net.hosts:
-        host.cmdPrint('../../tiny-lldpd/tlldpd -d -i 1')
+        host.cmd('../../tiny-lldpd/tlldpd -d -i 1')
 
     sleep(5)
 
@@ -61,7 +58,8 @@ def runMPI():
     # Launch MPI application
     print "Starting MPI application:"
     print "----------------------------------------"
-    net.hosts[0].cmdPrint('mpirun --machinefile ./machines ./mpitest');
+    for i in range(10):
+        net.hosts[0].cmdPrint('mpirun --machinefile ./machines ./mpitest');
     print "----------------------------------------"
     print "MPI application finished."
 
