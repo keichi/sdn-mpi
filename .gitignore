@@ -38,3 +38,8 @@ tmp
 .yardoc
 _yardoc
 doc/
+
+# Project specific
+mpitest/mpitest
+mpitest/pingpong
+mpitest/machines

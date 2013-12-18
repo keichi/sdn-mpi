@@ -80,7 +80,7 @@ def runMPI():
     print "----------------------------------------"
     print "MPI application finished."
 
-    net.hosts[0].cmdPrint('sudo killall tlldpd')
+    net.hosts[0].cmdPrint('sudo killall -9 tlldpd')
 
     net.stop()
     cleanup()
