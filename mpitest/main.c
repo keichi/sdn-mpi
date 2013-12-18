@@ -1,6 +1,7 @@
 #include <mpi.h>
 #include <stdio.h>
 #include <time.h>
+#include <unistd.h>
 
 char inmsg[1024 * 1024 * 50];
 char outmsg[1024 * 1024 * 50] = {0};
@@ -19,6 +20,10 @@ int main(int argc,char *argv[])
     float start_time = (float)clock() / CLOCKS_PER_SEC;
 
     int count = sizeof(outmsg) / sizeof(char);
+
+    if (rank == 1) {
+        sleep(1);
+    }
 
     for (i = 0; i < 5; i++) {
         switch (rank) {
