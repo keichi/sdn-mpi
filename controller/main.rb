@@ -90,42 +90,43 @@ class SDNMPIController < Controller
       return
     end
 
-    route_info = @topology.get_route_info route
+    p route
+
     puts "Flow add #{message.macsa} <-> #{message.macda} (#{message.eth_type.to_hex})"
-    route_info.each do |info|
+    for i in 0 .. route.size - 2
       # Add flow entry
       send_flow_mod_add(
-        info[:id],
+        route[i].dst_id,
         :match => Match.new(
-          :in_port => info[:in_port],
+          :in_port => route[i].dst_port,
           :dl_src => message.macsa,
           :dl_dst => message.macda,
           :dl_type => message.eth_type,
           :nw_proto => message.ipv4_protocol
         ),
-        :actions => ActionOutput.new(info[:out_port]),
+        :actions => ActionOutput.new(route[i + 1].src_port),
         :idle_timeout => 0,
         :hard_timeout => 0
       )
       send_flow_mod_add(
-        info[:id],
+        route[i].dst_id,
         :match => Match.new(
-          :in_port => info[:out_port],
+          :in_port => route[i + 1].src_port,
           :dl_src => message.macda,
           :dl_dst => message.macsa,
           :dl_type => message.eth_type,
           :nw_proto => message.ipv4_protocol
         ),
-        :actions => ActionOutput.new(info[:in_port]),
+        :actions => ActionOutput.new(route[i].dst_port),
         :idle_timeout => 0,
         :hard_timeout => 0
       )
     end
 
     send_packet_out(
-      route_info.last[:id],
+      route.last.src_id,
       :data => message.data,
-      :actions => SendOutPort.new(route_info.last[:out_port])
+      :actions => SendOutPort.new(route.last.src_port)
     )
   end
 

@@ -76,22 +76,6 @@ class Topology
     end
   end
 
-  def get_route_info(route)
-    info = []
-
-    route.each_with_index do |node, i|
-      next unless node.switch?
-
-      node_info = {}
-      node_info[:id] = node.id
-      node_info[:in_port] = node.ports.find {|p, l| l.dst_id == route[i - 1].id}[0]
-      node_info[:out_port] = node.ports.find {|p, l| l.dst_id == route[i + 1].id}[0]
-      info.push node_info
-    end
-
-    info
-  end
-
   def route(src_id, dst_id)
     return unless @nodes.key? src_id and @nodes.key? dst_id
 
@@ -99,14 +83,17 @@ class Topology
 
     return if @nodes[src_id].cost.nil? or @nodes[dst_id].cost.nil?
 
-    base = @nodes[dst_id]
-    route = [base]
+    current = @nodes[dst_id]
+    route = []
 
-    while base = @nodes[base.from]
-      route.push base
+    while before = @nodes[current.from]
+      link = before.ports.values.find {|l| l.dst_id == current.id}
+      route.unshift link
+
+      current = before
     end
 
-    route.reverse
+    route
   end
 
   def cost(nid, sid)
