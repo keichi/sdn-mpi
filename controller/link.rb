@@ -1,10 +1,5 @@
 class Link
-  attr_reader :src_id
-  attr_reader :dst_id
-  attr_reader :src_port
-  attr_reader :dst_port
-  attr_reader :tx_speed
-  attr_reader :rx_speed
+  attr_reader :src_id, :dst_id, :src_port, :dst_port, :tx_speed, :rx_speed
 
   def initialize(src_id, src_port, dst_id, dst_port)
     @last_updated = Time.now

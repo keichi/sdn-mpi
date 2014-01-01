@@ -1,9 +1,6 @@
 class Node
-  attr_reader :id
-  attr_reader :ports
-  attr_accessor :from
-  attr_accessor :cost
-  attr_accessor :done
+  attr_reader :id, :ports
+  attr_accessor :from, :cost, :done
 
   def initialize(type, id, ports)
     @last_updated = Time.now
