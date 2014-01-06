@@ -90,8 +90,6 @@ class SDNMPIController < Controller
       return
     end
 
-    p route
-
     puts "Flow add #{message.macsa} <-> #{message.macda} (#{message.eth_type.to_hex})"
     for i in 0 .. route.size - 2
       # Add flow entry
