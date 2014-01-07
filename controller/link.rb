@@ -31,4 +31,8 @@ class Link
   def timed_out?(ttl)
     Time.now - @last_updated > ttl
   end
+
+  def cost
+    1 + @tx_speed / 1024.0 + @rx_speed / 1024.0
+  end
 end
