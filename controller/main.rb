@@ -90,6 +90,12 @@ class SDNMPIController < Controller
       return
     end
 
+    # Increment connection count for each links in route
+    route.each do |link|
+      link.tx_connections += 1
+      @topology.nodes[link.dst_id].ports[link.dst_port].rx_connections += 1
+    end
+
     puts "Flow add #{message.macsa} <-> #{message.macda} (#{message.eth_type.to_hex})"
     for i in 0 .. route.size - 2
       # Add flow entry

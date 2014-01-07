@@ -3,7 +3,7 @@ require 'node'
 require 'link'
 
 class Topology
-  attr_accessor :nodes
+  attr_reader :nodes
 
   def initialize ttl
     @nodes = {}
@@ -80,8 +80,10 @@ class Topology
         dst_port = l.dst_port
         tx_speed = sprintf"%.2f", l.tx_speed
         rx_speed = sprintf"%.2f", l.rx_speed
+        tx_connections = l.tx_connections
+        rx_connections = l.rx_connections
 
-        puts "#{src_id}(#{src_port}) -> #{dst_id}(#{dst_port}) (#{tx_speed}, #{rx_speed})"
+        puts "#{src_id}(#{src_port}) -> #{dst_id}(#{dst_port}) (#{tx_speed}, #{rx_speed}, #{tx_connections}, #{rx_connections})"
       end
     end
   end

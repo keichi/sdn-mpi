@@ -1,5 +1,6 @@
 class Link
   attr_reader :src_id, :dst_id, :src_port, :dst_port, :tx_speed, :rx_speed
+  attr_accessor :tx_connections,:rx_connections
 
   def initialize(src_id, src_port, dst_id, dst_port)
     @last_updated = Time.now
@@ -12,6 +13,8 @@ class Link
     @rx_bytes = 0
     @tx_speed = 0.0
     @rx_speed = 0.0
+    @tx_connections = 0
+    @rx_connections = 0
   end
 
   def update
@@ -33,6 +36,6 @@ class Link
   end
 
   def cost
-    1 + @tx_speed / 1024.0 + @rx_speed / 1024.0
+    1 + @tx_speed / 1024.0 + @rx_speed / 1024.0 + @tx_connections + @rx_connections
   end
 end
