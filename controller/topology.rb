@@ -40,6 +40,16 @@ class Topology
   
     link = @nodes[datapath_id].ports[port]
     link.update_stats port_stats
+
+    # If dst of this link is a host, update stats for that host too.
+    # should think about a better implementation...
+    if @nodes[link.dst_id].host?
+      port_stats_reversed = PortStatsReply.new(
+        :tx_bytes => port_stats.rx_bytes,
+        :rx_bytes => port_stats.tx_bytes
+      )
+      @nodes[link.dst_id].ports[link.dst_port].update_stats port_stats_reversed
+    end
   end
 
   def tick
