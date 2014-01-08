@@ -2,38 +2,28 @@
 #include <stdio.h>
 #include <time.h>
 #include <unistd.h>
+#include <string.h>
 
 #define MESSAGE_SIZE    (1024 * 1024 * 32)
-#define MESSAGE_COUNT   (32)
 #define RUN_COUNT       (3)
 
-char inmsg[MESSAGE_SIZE];
-char outmsg[MESSAGE_SIZE] = {0};
+int inmsg[MESSAGE_SIZE];
+int outmsg[MESSAGE_SIZE] = {0};
 
-void run_send_recv()
+void run_reduce()
 {
     int rank;
     int i;
     int tag = 1;
-    int count = sizeof(outmsg) / sizeof(char);
+    int count = sizeof(outmsg) / sizeof(int);
     MPI_Status stat;
 
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
-    switch (rank) {
-        case 0:
-        for (i = 0; i < MESSAGE_COUNT; i++) MPI_Send(outmsg, count, MPI_CHAR, 2, tag, MPI_COMM_WORLD);
-        break;
-        case 1:
-        for (i = 0; i < MESSAGE_COUNT; i++) MPI_Send(outmsg, count, MPI_CHAR, 3, tag, MPI_COMM_WORLD);
-        break;
-        case 2:
-        for (i = 0; i < MESSAGE_COUNT; i++) MPI_Recv(inmsg, count, MPI_CHAR, 0, tag, MPI_COMM_WORLD, NULL);
-        break;
-        case 3:
-        for (i = 0; i < MESSAGE_COUNT; i++) MPI_Recv(inmsg, count, MPI_CHAR, 1, tag, MPI_COMM_WORLD, NULL);
-        break;
-    }
+    memset(inmsg, 0, MESSAGE_SIZE);
+    memset(outmsg, 0, MESSAGE_SIZE);
+
+    MPI_Reduce(inmsg, outmsg, count, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
 
     MPI_Barrier(MPI_COMM_WORLD);
 }
@@ -49,7 +39,7 @@ int main(int argc,char *argv[])
     float start_time = (float)clock() / CLOCKS_PER_SEC;
     
     for (i = 0; i < RUN_COUNT; i++) {
-        run_send_recv();
+        run_reduce();
     }
 
     float end_time = (float)clock() / CLOCKS_PER_SEC;

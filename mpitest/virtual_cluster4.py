@@ -4,7 +4,6 @@ from mininet.topo import Topo
 from mininet.net import Mininet
 from mininet.link import TCLink
 from mininet.node import RemoteController
-from mininet.util import dumpNodeConnections
 from mininet.log import setLogLevel
 from mininet.clean import cleanup
 from time import sleep
@@ -45,9 +44,6 @@ def runMPI():
 
     sleep(5)
 
-    print "Testing network connectivity"
-    net.pingAll()
-
     # Launch sshd on each hosts and output host IPs to machinefile
     f = open('./machines', 'w')
     for h in net.hosts:
@@ -58,8 +54,7 @@ def runMPI():
     # Launch MPI application
     print "Starting MPI application:"
     print "----------------------------------------"
-    for i in range(10):
-        net.hosts[0].cmdPrint('mpirun --machinefile ./machines ./mpitest');
+    net.hosts[0].cmdPrint('mpirun --machinefile ./machines ./mpitest');
     print "----------------------------------------"
     print "MPI application finished."
 
