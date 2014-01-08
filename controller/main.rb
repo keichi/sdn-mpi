@@ -3,6 +3,7 @@ require 'lldp_parser'
 require 'arp_parser'
 require 'arp_table'
 require 'topology'
+require 'socket'
 
 class SDNMPIController < Controller
   periodic_timer_event :flood_lldp_packets, 1
@@ -13,6 +14,19 @@ class SDNMPIController < Controller
   def start
     @arp_table = ArpTable.new 5
     @topology = Topology.new 5
+
+    File.unlink '/tmp/sdn-mpi.sock'
+    @server = UNIXServer.open('/tmp/sdn-mpi.sock')
+    @server_thread = Thread.new do
+      while true do
+        socket = @server.accept
+
+        puts socket.gets
+        socket.write 'ok\n'
+
+        socket.close
+      end
+    end
   end
 
   def tick_arp_table
