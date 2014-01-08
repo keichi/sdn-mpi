@@ -15,7 +15,7 @@ class SDNMPIController < Controller
     @arp_table = ArpTable.new 5
     @topology = Topology.new 5
 
-    File.unlink '/tmp/sdn-mpi.sock'
+    File.unlink '/tmp/sdn-mpi.sock' if File.exists? '/tmp/sdn-mpi.sock'
     @server = UNIXServer.open('/tmp/sdn-mpi.sock')
     @server_thread = Thread.new do
       while true do
@@ -220,8 +220,8 @@ class SDNMPIController < Controller
 
     if mac
       reply = ARP.new(
-        :src_mac  =>  mac,
-        :dst_mac  =>  request.src_hardware_address.binary_s_to_i,
+        :src_mac  =>  message.macsa.to_i,
+        :dst_mac  =>  message.macda.to_i,
         :opcode   =>  2,
         :src_hardware_address =>  mac.uint48_to_s,
         :src_protocol_address =>  request.dst_protocol_address,
