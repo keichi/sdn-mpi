@@ -99,7 +99,7 @@ class Topology
     route = []
 
     while before = @nodes[current.from]
-      link = before.ports.values.find {|l| l.dst_id == current.id}
+      link = before.ports.values.find {|l| not l.nil? and l.dst_id == current.id}
       route.unshift link
 
       current = before
