@@ -36,6 +36,6 @@ class Link
   end
 
   def cost
-    1 + @tx_speed / 1024.0 + @rx_speed / 1024.0 + @tx_connections + @rx_connections
+    1
   end
 end
