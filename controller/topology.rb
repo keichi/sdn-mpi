@@ -108,11 +108,6 @@ class Topology
     route
   end
 
-  def cost(nid, sid)
-    dijkstra sid
-    @nodes[nid].cost
-  end
-
   def dijkstra(sid)
     # initialize nodes
     @nodes.each do |id, node|
