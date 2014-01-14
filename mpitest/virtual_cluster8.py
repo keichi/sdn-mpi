@@ -51,7 +51,7 @@ class TestTopo(Topo):
 def runMPI():
     # Create network
     topo = TestTopo()
-    net = Mininet(topo=topo, controller=lambda name: RemoteController(name, ip='127.0.0.1', port=6653), link=TCLink)
+    net = Mininet(topo=topo, controller=lambda name: RemoteController(name, ip='127.0.0.1'), link=TCLink)
     # net = Mininet(topo=topo, controller=OVSController, link=TCLink)
     net.start()
 
