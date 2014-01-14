@@ -45,9 +45,12 @@ def runMPI():
     sleep(5)
 
     # Launch sshd on each hosts and output host IPs to machinefile
+    pids = []
     f = open('./machines', 'w')
     for h in net.hosts:
-        h.cmd('/usr/sbin/sshd -o UseDNS=no -u0')
+        h.cmd('/usr/sbin/sshd -D -o UseDNS=no -u0 &')
+        pid = int(h.cmd('echo $!'))
+        pids.append(pid)
         f.write('%s\n' % h.IP())
     f.close()
 
@@ -58,7 +61,9 @@ def runMPI():
     print "----------------------------------------"
     print "MPI application finished."
 
-    net.hosts[0].cmdPrint('sudo killall -9 tlldpd')
+    for pid in pids:
+        h.cmd('kill -9 %s' % pid)
+    net.hosts[0].cmd('killall -9 tlldpd')
 
     net.stop()
     cleanup()
