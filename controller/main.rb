@@ -21,7 +21,26 @@ class SDNMPIController < Controller
       while true do
         socket = @server.accept
 
-        puts socket.gets
+        message = socket.gets.split ' '
+
+        case message[0]
+        when 'mpi_init'
+          @arp_table.update_rank message[2].ip_s_to_i, message[1].to_i
+
+        when 'begin_mpi_send'
+          src = @arp_table.resolve_rank message[1].to_i
+          dst = @arp_table.resolve_rank message[2].to_i
+
+          if src and dst
+            puts "reserving route #{src.ip.to_ip_s} -> #{dst.ip.to_ip_s}"
+          end
+
+        when 'end_mpi_send'
+
+        else 
+          puts "unrecoginized message: #{message[0]}"
+        end
+
         socket.write 'ok\n'
 
         socket.close
@@ -31,12 +50,12 @@ class SDNMPIController < Controller
 
   def tick_arp_table
     @arp_table.tick
-    #@arp_table.dump
+    # @arp_table.dump
   end
 
   def tick_topology
     @topology.tick
-    #@topology.dump
+    # @topology.dump
   end
 
   def request_port_stats
@@ -210,14 +229,14 @@ class SDNMPIController < Controller
 
   def send_arp_reply datapath_id, message
     request = ARP.read message.data
-    mac = @arp_table.resolve_ip request.dst_protocol_address.binary_s_to_i
+    entry = @arp_table.resolve_ip request.dst_protocol_address.binary_s_to_i
 
-    if mac
+    if entry
       reply = ARP.new(
         :src_mac  =>  message.macsa.to_i,
         :dst_mac  =>  message.macda.to_i,
         :opcode   =>  2,
-        :src_hardware_address =>  mac.uint48_to_s,
+        :src_hardware_address =>  entry.mac.uint48_to_s,
         :src_protocol_address =>  request.dst_protocol_address,
         :dst_hardware_address =>  request.src_hardware_address,
         :dst_protocol_address =>  request.src_protocol_address,

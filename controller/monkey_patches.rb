@@ -32,4 +32,8 @@ class String
   def binary_s_to_i
     self.unpack('C*').reduce(0) {|val, c| (val << 8 | c)}
   end
+
+  def ip_s_to_i
+    self.split('.').map {|s| s.to_i}.pack('C*').binary_s_to_i
+  end
 end
