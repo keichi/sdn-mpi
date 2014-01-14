@@ -17,6 +17,8 @@ class SDNMPIController < Controller
 
     File.unlink '/tmp/sdn-mpi.sock' if File.exists? '/tmp/sdn-mpi.sock'
     @server = UNIXServer.open('/tmp/sdn-mpi.sock')
+
+    Thread.abort_on_exception = true
     @server_thread = Thread.new do
       while true do
         socket = @server.accept
@@ -32,10 +34,56 @@ class SDNMPIController < Controller
           dst = @arp_table.resolve_rank message[2].to_i
 
           if src and dst
-            puts "reserving route #{src.ip.to_ip_s} -> #{dst.ip.to_ip_s}"
+            route = @topology.route src.mac, dst.mac
+            if route.nil?
+              puts "no route"
+            end
+
+            for i in 0 .. route.size - 2
+              send_flow_mod_add(
+                route[i].dst_id,
+                :match => Match.new(
+                  :in_port => route[i].dst_port,
+                  :dl_src => src.mac,
+                  :dl_dst => dst.mac
+                ),
+                :priority => 0xffff,
+                :actions => ActionOutput.new(route[i + 1].src_port),
+                :cookie => (0xbabe << 16 | (message[1].to_i & 0xff) << 8) | (message[2].to_i & 0xff)
+              )
+              send_flow_mod_add(
+                route[i].dst_id,
+                :match => Match.new(
+                  :in_port => route[i + 1].src_port,
+                  :dl_src => dst.mac,
+                  :dl_dst => src.mac
+                ),
+                :priority => 0xffff,
+                :actions => ActionOutput.new(route[i].dst_port),
+                :cookie => (0xbabe << 16 | (message[1].to_i & 0xff) << 8) | (message[2].to_i & 0xff)
+              )
+            end
+
+            puts "Flow added #{src.ip.to_ip_s} <-> #{dst.ip.to_ip_s}"
+          else
+            puts "Rank is not registered: #{message[1].to_i} or #{message[2].to_i}"
           end
 
         when 'end_mpi_send'
+          src = message[1].to_i
+          dst = message[2].to_i
+
+          @topology.nodes.each do |dpid, node|
+            if node.switch?
+              send_flow_mod_delete(
+                route[i].dst_id,
+                :cookie => (0xbabe << 16 | (src & 0xff) << 8) | (dst & 0xff),
+                :strict => true
+              )
+            end
+          end
+
+          puts "Flow removed #{src} <-> #{dst}"
 
         else 
           puts "unrecoginized message: #{message[0]}"
@@ -123,7 +171,7 @@ class SDNMPIController < Controller
       return
     end
 
-    puts "Flow add #{message.macsa} <-> #{message.macda} (#{message.eth_type.to_hex})"
+    puts "Flow add #{message.macsa} <-> #{message.macda}"
     for i in 0 .. route.size - 2
       # Add flow entry
       send_flow_mod_add(
@@ -131,26 +179,20 @@ class SDNMPIController < Controller
         :match => Match.new(
           :in_port => route[i].dst_port,
           :dl_src => message.macsa,
-          :dl_dst => message.macda,
-          :dl_type => message.eth_type,
-          :nw_proto => message.ipv4_protocol
+          :dl_dst => message.macda
         ),
         :actions => ActionOutput.new(route[i + 1].src_port),
-        :idle_timeout => 0,
-        :hard_timeout => 0
+        :priority => 0x7fff
       )
       send_flow_mod_add(
         route[i].dst_id,
         :match => Match.new(
           :in_port => route[i + 1].src_port,
           :dl_src => message.macda,
-          :dl_dst => message.macsa,
-          :dl_type => message.eth_type,
-          :nw_proto => message.ipv4_protocol
+          :dl_dst => message.macsa
         ),
         :actions => ActionOutput.new(route[i].dst_port),
-        :idle_timeout => 0,
-        :hard_timeout => 0
+        :priority => 0x7fff
       )
     end
 

@@ -11,7 +11,7 @@
 #include <net/if.h>
 #include <netinet/in.h>
 
-#define MESSAGE_SIZE    (1024 * 1024 * 32)
+#define MESSAGE_SIZE    (1024 * 1024 * 8)
 #define MESSAGE_COUNT   (32)
 #define RUN_COUNT       (3)
 #define CONTROLLER_ADDRESS  "/tmp/sdn-mpi.sock"
@@ -60,7 +60,7 @@ int SDN_MPI_Send(void *buf, int count, MPI_Datatype datatype, int dest, int tag,
 
     MPI_Send(buf, count, datatype, dest, tag, comm);
 
-    notify_controller("end_mpi_send\n");
+    notify_controller("end_mpi_send %d %d\n", rank, dest);
 }
 
 int SDN_MPI_Init(int *argc, char ***argv)
