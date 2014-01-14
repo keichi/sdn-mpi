@@ -36,6 +36,6 @@ class Link
   end
 
   def cost
-    1
+    1 + @tx_speed / 1024.0
   end
 end

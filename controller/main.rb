@@ -34,7 +34,7 @@ class SDNMPIController < Controller
           dst = @arp_table.resolve_rank message[2].to_i
 
           if src and dst
-            route = @topology.route src.mac, dst.mac
+            route = @topology.route src.mac, dst.mac, true
             if route.nil?
               puts "no route"
             end
@@ -64,7 +64,7 @@ class SDNMPIController < Controller
               )
             end
 
-            puts "Flow added #{src.ip.to_ip_s} <-> #{dst.ip.to_ip_s}"
+            # puts "Flow added #{src.ip.to_ip_s} <-> #{dst.ip.to_ip_s}"
           else
             puts "Rank is not registered: #{message[1].to_i} or #{message[2].to_i}"
           end
@@ -83,7 +83,7 @@ class SDNMPIController < Controller
             end
           end
 
-          puts "Flow removed #{src} <-> #{dst}"
+          # puts "Flow removed #{src} <-> #{dst}"
 
         else 
           puts "unrecoginized message: #{message[0]}"
@@ -103,7 +103,7 @@ class SDNMPIController < Controller
 
   def tick_topology
     @topology.tick
-    # @topology.dump
+    @topology.dump
   end
 
   def request_port_stats
@@ -165,7 +165,7 @@ class SDNMPIController < Controller
     src_mac = message.macsa.to_i
     dst_mac = message.macda.to_i
 
-    route = @topology.route src_mac, dst_mac
+    route = @topology.route src_mac, dst_mac, false
     if route.nil?
       puts "No route from #{message.macsa} to #{message.macda}"
       return

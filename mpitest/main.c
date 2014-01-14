@@ -11,9 +11,9 @@
 #include <net/if.h>
 #include <netinet/in.h>
 
-#define MESSAGE_SIZE    (1024 * 1024 * 8)
+#define MESSAGE_SIZE    (1024 * 1024 * 128)
 #define MESSAGE_COUNT   (32)
-#define RUN_COUNT       (3)
+#define RUN_COUNT       (10)
 #define CONTROLLER_ADDRESS  "/tmp/sdn-mpi.sock"
 #define CONTROLLER_RECV_BUF_SIZE    (1024)
 
