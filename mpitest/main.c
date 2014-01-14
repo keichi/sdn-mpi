@@ -7,11 +7,15 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdarg.h>
+#include <ifaddrs.h>
+#include <net/if.h>
+#include <netinet/in.h>
 
 #define MESSAGE_SIZE    (1024 * 1024 * 32)
 #define MESSAGE_COUNT   (32)
 #define RUN_COUNT       (3)
 #define CONTROLLER_ADDRESS  "/tmp/sdn-mpi.sock"
+#define CONTROLLER_RECV_BUF_SIZE    (1024)
 
 char inmsg[MESSAGE_SIZE];
 char outmsg[MESSAGE_SIZE] = {0};
@@ -20,7 +24,7 @@ void notify_controller(const char* format, ...)
 {
     int sock, len;
     struct sockaddr_un sa;
-    char buf[1024];
+    char buf[CONTROLLER_RECV_BUF_SIZE];
     va_list arg;
 
     va_start(arg, format);
@@ -29,7 +33,7 @@ void notify_controller(const char* format, ...)
 
     if ((sock = socket(AF_UNIX, SOCK_STREAM, 0)) < 0) {
         printf("Failed to open UNIX socket.\n");
-        exit(1);
+        exit(EXIT_FAILURE);
     }
 
     sa.sun_family = AF_UNIX;
@@ -38,11 +42,11 @@ void notify_controller(const char* format, ...)
 
     if ((connect(sock, (struct sockaddr *)&sa, len)) < 0) {
         printf("Failed to connect to SDN MPI controller\n");
-        exit(1);
+        exit(EXIT_FAILURE);
     }
 
     write(sock, buf, strlen(buf) + 1);
-    read(sock, buf, 1024);
+    read(sock, buf, CONTROLLER_RECV_BUF_SIZE);
 
     close(sock);
 }
@@ -57,6 +61,43 @@ int SDN_MPI_Send(void *buf, int count, MPI_Datatype datatype, int dest, int tag,
     MPI_Send(buf, count, datatype, dest, tag, comm);
 
     notify_controller("end_mpi_send\n");
+}
+
+int SDN_MPI_Init(int *argc, char ***argv)
+{
+    MPI_Init(argc, argv);
+
+    int rank;
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+
+    struct ifaddrs *ifa_list, *ifa;
+    char addrstr[256];
+
+    if (getifaddrs(&ifa_list) < 0) {
+        printf("Could not get interface addresses.\n");
+        exit(EXIT_FAILURE);
+    }
+
+    for (ifa = ifa_list; ifa != NULL; ifa = ifa->ifa_next) {
+        if (ifa->ifa_addr == NULL) {
+            continue;
+        }
+        if (!(ifa->ifa_flags & IFF_UP) || (ifa->ifa_flags & IFF_LOOPBACK)) {
+            continue;
+        }
+
+        if (ifa->ifa_addr->sa_family == AF_INET) {
+            inet_ntop(
+                AF_INET,
+                &((struct sockaddr_in *)ifa->ifa_addr)->sin_addr,
+                addrstr,
+                sizeof(addrstr)
+            );
+            notify_controller("mpi_init %d %s\n", rank, addrstr);
+        }
+    }
+
+    freeifaddrs(ifa_list);
 }
 
 void run_send_recv()
@@ -92,7 +133,7 @@ int main(int argc,char *argv[])
     int i;
     int rank;
 
-    MPI_Init(&argc,&argv);
+    SDN_MPI_Init(&argc,&argv);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
     float start_time = (float)clock() / CLOCKS_PER_SEC;
