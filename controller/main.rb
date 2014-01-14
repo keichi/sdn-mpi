@@ -14,6 +14,7 @@ class SDNMPIController < Controller
   def start
     @arp_table = ArpTable.new 5
     @topology = Topology.new 5
+    @reserved_routes = {}
 
     File.unlink '/tmp/sdn-mpi.sock' if File.exists? '/tmp/sdn-mpi.sock'
     @server = UNIXServer.open('/tmp/sdn-mpi.sock')
@@ -39,6 +40,8 @@ class SDNMPIController < Controller
               puts "no route"
             end
 
+            cookie = (0xbabe << 16 | (message[1].to_i & 0xff) << 8) | (message[2].to_i & 0xff)
+
             for i in 0 .. route.size - 2
               send_flow_mod_add(
                 route[i].dst_id,
@@ -49,7 +52,7 @@ class SDNMPIController < Controller
                 ),
                 :priority => 0xffff,
                 :actions => ActionOutput.new(route[i + 1].src_port),
-                :cookie => (0xbabe << 16 | (message[1].to_i & 0xff) << 8) | (message[2].to_i & 0xff)
+                :cookie => cookie
               )
               send_flow_mod_add(
                 route[i].dst_id,
@@ -60,9 +63,15 @@ class SDNMPIController < Controller
                 ),
                 :priority => 0xffff,
                 :actions => ActionOutput.new(route[i].dst_port),
-                :cookie => (0xbabe << 16 | (message[1].to_i & 0xff) << 8) | (message[2].to_i & 0xff)
+                :cookie => cookie
               )
             end
+
+            route.each do |link|
+              link.tx_connections += 1
+              @topology.nodes[link.dst_id].ports[link.dst_port].rx_connections += 1
+            end
+            @reserved_routes[cookie] = route
 
             # puts "Flow added #{src.ip.to_ip_s} <-> #{dst.ip.to_ip_s}"
           else
@@ -72,16 +81,23 @@ class SDNMPIController < Controller
         when 'end_mpi_send'
           src = message[1].to_i
           dst = message[2].to_i
+          cookie = (0xbabe << 16 | (message[1].to_i & 0xff) << 8) | (message[2].to_i & 0xff)
 
           @topology.nodes.each do |dpid, node|
             if node.switch?
               send_flow_mod_delete(
                 route[i].dst_id,
-                :cookie => (0xbabe << 16 | (src & 0xff) << 8) | (dst & 0xff),
+                :cookie => cookie,
                 :strict => true
               )
             end
           end
+
+          @reserved_routes[cookie].each do |link|
+            link.tx_connections -= 1
+            @topology.nodes[link.dst_id].ports[link.dst_port].rx_connections -= 1
+          end
+          @reserved_routes[cookie] = nil
 
           # puts "Flow removed #{src} <-> #{dst}"
 
