@@ -31,12 +31,12 @@ class SDNMPIController < Controller
 
   def tick_arp_table
     @arp_table.tick
-    @arp_table.dump
+    #@arp_table.dump
   end
 
   def tick_topology
     @topology.tick
-    @topology.dump
+    #@topology.dump
   end
 
   def request_port_stats
