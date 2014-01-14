@@ -87,7 +87,7 @@ class SDNMPIController < Controller
 
     # Ad hoc.
     # Drop IPv6 multicast packets
-    return if message.macda.to_s.start_with? '33:33:'
+    return if message.macda.to_s.start_with? '33:33:' or message.macda.broadcast?
 
     install_new_route datapath_id, message
   end
