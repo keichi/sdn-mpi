@@ -88,10 +88,10 @@ class Topology
     end
   end
 
-  def route(src_id, dst_id)
+  def route(src_id, dst_id, dynamic)
     return unless @nodes.key? src_id and @nodes.key? dst_id
 
-    dijkstra src_id
+    dijkstra src_id, dynamic
 
     return if @nodes[src_id].cost.nil? or @nodes[dst_id].cost.nil?
 
@@ -99,7 +99,7 @@ class Topology
     route = []
 
     while before = @nodes[current.from]
-      link = before.ports.values.find {|l| l.dst_id == current.id}
+      link = before.ports.values.find {|l| not l.nil? and l.dst_id == current.id}
       route.unshift link
 
       current = before
@@ -108,12 +108,7 @@ class Topology
     route
   end
 
-  def cost(nid, sid)
-    dijkstra sid
-    @nodes[nid].cost
-  end
-
-  def dijkstra(sid)
+  def dijkstra(sid, dynamic)
     # initialize nodes
     @nodes.each do |id, node|
       node.cost = nil
@@ -138,7 +133,7 @@ class Topology
         next if link.nil? or not @nodes.key? link.dst_id
 
         to = @nodes[link.dst_id]
-        cost = done_node.cost + link.cost
+        cost = done_node.cost + (dynamic ? link.cost : 1)
         from = done_node.id
 
         if to.cost.nil? or cost < to.cost

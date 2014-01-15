@@ -39,7 +39,7 @@ class TestTopo(Topo):
 
 def perfTest():
     topo = TestTopo()
-    net = Mininet(topo=topo, controller=lambda name: RemoteController(name, ip='127.0.0.1', port=6653), link=TCLink)
+    net = Mininet(topo=topo, controller=lambda name: RemoteController(name, ip='127.0.0.1'), link=TCLink)
     net.start()
     print "Dumping connections"
     dumpNodeConnections(net.hosts)

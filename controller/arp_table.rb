@@ -3,11 +3,13 @@ require 'monkey_patches'
 class ArpEntry
   attr_reader :ip
   attr_reader :mac
+  attr_accessor :rank
 
   def initialize(ip, mac)
     @last_updated = Time.now
     @ip = ip
     @mac = mac
+    @rank = 0
   end
 
   def update(ip, mac)
@@ -36,20 +38,21 @@ class ArpTable
     end
   end
 
+  def update_rank(ip, rank)
+    arp_entry = @table.find {|entry| entry.ip == ip}
+    arp_entry.rank = rank if arp_entry
+  end
+
   def tick
     @table.delete_if {|entry| entry.timed_out? @ttl}
   end
 
   def resolve_ip(ip)
-    arp_entry = @table.find {|entry| entry.ip == ip}
-
-    arp_entry.mac if arp_entry
+    @table.find {|entry| entry.ip == ip}
   end
 
-  def resolve_mac(mac)
-    arp_entry = @table.find {|entry| entry.mac == mac}
-
-    arp_entry.ip if arp_entry
+  def resolve_rank(rank)
+    @table.find {|entry| entry.rank == rank}
   end
 
   def dump
@@ -57,7 +60,7 @@ class ArpTable
     @table.each do |entry|
       ip_addr = entry.ip.to_ip_s
       mac_addr = entry.mac.to_mac_s
-      puts "#{ip_addr} at #{mac_addr}"
+      puts "rank #{entry.rank} is #{ip_addr} at #{mac_addr}"
     end
   end
 end

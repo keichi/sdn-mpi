@@ -3,6 +3,7 @@ require 'lldp_parser'
 require 'arp_parser'
 require 'arp_table'
 require 'topology'
+require 'socket'
 
 class SDNMPIController < Controller
   periodic_timer_event :flood_lldp_packets, 1
@@ -13,11 +14,107 @@ class SDNMPIController < Controller
   def start
     @arp_table = ArpTable.new 5
     @topology = Topology.new 5
+    @reserved_routes = {}
+
+    File.unlink '/tmp/sdn-mpi.sock' if File.exists? '/tmp/sdn-mpi.sock'
+    @server = UNIXServer.open('/tmp/sdn-mpi.sock')
+
+    Thread.abort_on_exception = true
+    @server_thread = Thread.new do
+      while true do
+        socket = @server.accept
+
+        message = socket.gets.split ' '
+
+        case message[0]
+        when 'mpi_init'
+          @arp_table.update_rank message[2].ip_s_to_i, message[1].to_i
+
+        when 'begin_mpi_send'
+          src = @arp_table.resolve_rank message[1].to_i
+          dst = @arp_table.resolve_rank message[2].to_i
+
+          if src and dst
+            route = @topology.route src.mac, dst.mac, true
+            if route.nil?
+              puts "no route"
+            end
+
+            cookie = (0xbabe << 16 | (message[1].to_i & 0xff) << 8) | (message[2].to_i & 0xff)
+
+            for i in 0 .. route.size - 2
+              send_flow_mod_add(
+                route[i].dst_id,
+                :match => Match.new(
+                  :in_port => route[i].dst_port,
+                  :dl_src => src.mac,
+                  :dl_dst => dst.mac
+                ),
+                :priority => 0xffff,
+                :actions => ActionOutput.new(route[i + 1].src_port),
+                :cookie => cookie
+              )
+              send_flow_mod_add(
+                route[i].dst_id,
+                :match => Match.new(
+                  :in_port => route[i + 1].src_port,
+                  :dl_src => dst.mac,
+                  :dl_dst => src.mac
+                ),
+                :priority => 0xffff,
+                :actions => ActionOutput.new(route[i].dst_port),
+                :cookie => cookie
+              )
+            end
+
+            route.each do |link|
+              link.tx_connections += 1
+              @topology.nodes[link.dst_id].ports[link.dst_port].rx_connections += 1
+            end
+            @reserved_routes[cookie] = route
+
+            # puts "Flow added #{src.ip.to_ip_s} <-> #{dst.ip.to_ip_s}"
+          else
+            puts "Rank is not registered: #{message[1].to_i} or #{message[2].to_i}"
+          end
+
+        when 'end_mpi_send'
+          src = message[1].to_i
+          dst = message[2].to_i
+          cookie = (0xbabe << 16 | (message[1].to_i & 0xff) << 8) | (message[2].to_i & 0xff)
+
+          @topology.nodes.each do |dpid, node|
+            if node.switch?
+              send_flow_mod_delete(
+                route[i].dst_id,
+                :cookie => cookie,
+                :strict => true
+              )
+            end
+          end
+
+          @reserved_routes[cookie].each do |link|
+            link.tx_connections -= 1
+            @topology.nodes[link.dst_id].ports[link.dst_port].rx_connections -= 1
+          end
+          @reserved_routes[cookie] = nil
+
+          # puts "Flow removed #{src} <-> #{dst}"
+
+        else 
+          puts "unrecoginized message: #{message[0]}"
+        end
+
+        socket.write 'ok\n'
+
+        socket.close
+      end
+    end
   end
 
   def tick_arp_table
     @arp_table.tick
-    @arp_table.dump
+    # @arp_table.dump
   end
 
   def tick_topology
@@ -73,7 +170,7 @@ class SDNMPIController < Controller
 
     # Ad hoc.
     # Drop IPv6 multicast packets
-    return if message.macda.to_s.start_with? '33:33:'
+    return if message.macda.to_s.start_with? '33:33:' or message.macda.broadcast?
 
     install_new_route datapath_id, message
   end
@@ -84,19 +181,13 @@ class SDNMPIController < Controller
     src_mac = message.macsa.to_i
     dst_mac = message.macda.to_i
 
-    route = @topology.route src_mac, dst_mac
+    route = @topology.route src_mac, dst_mac, false
     if route.nil?
       puts "No route from #{message.macsa} to #{message.macda}"
       return
     end
 
-    # Increment connection count for each links in route
-    route.each do |link|
-      link.tx_connections += 1
-      @topology.nodes[link.dst_id].ports[link.dst_port].rx_connections += 1
-    end
-
-    puts "Flow add #{message.macsa} <-> #{message.macda} (#{message.eth_type.to_hex})"
+    puts "Flow add #{message.macsa} <-> #{message.macda}"
     for i in 0 .. route.size - 2
       # Add flow entry
       send_flow_mod_add(
@@ -104,26 +195,20 @@ class SDNMPIController < Controller
         :match => Match.new(
           :in_port => route[i].dst_port,
           :dl_src => message.macsa,
-          :dl_dst => message.macda,
-          :dl_type => message.eth_type,
-          :nw_proto => message.ipv4_protocol
+          :dl_dst => message.macda
         ),
         :actions => ActionOutput.new(route[i + 1].src_port),
-        :idle_timeout => 0,
-        :hard_timeout => 0
+        :priority => 0x7fff
       )
       send_flow_mod_add(
         route[i].dst_id,
         :match => Match.new(
           :in_port => route[i + 1].src_port,
           :dl_src => message.macda,
-          :dl_dst => message.macsa,
-          :dl_type => message.eth_type,
-          :nw_proto => message.ipv4_protocol
+          :dl_dst => message.macsa
         ),
         :actions => ActionOutput.new(route[i].dst_port),
-        :idle_timeout => 0,
-        :hard_timeout => 0
+        :priority => 0x7fff
       )
     end
 
@@ -202,14 +287,14 @@ class SDNMPIController < Controller
 
   def send_arp_reply datapath_id, message
     request = ARP.read message.data
-    mac = @arp_table.resolve_ip request.dst_protocol_address.binary_s_to_i
+    entry = @arp_table.resolve_ip request.dst_protocol_address.binary_s_to_i
 
-    if mac
+    if entry
       reply = ARP.new(
-        :src_mac  =>  mac,
-        :dst_mac  =>  request.src_hardware_address.binary_s_to_i,
+        :src_mac  =>  message.macsa.to_i,
+        :dst_mac  =>  message.macda.to_i,
         :opcode   =>  2,
-        :src_hardware_address =>  mac.uint48_to_s,
+        :src_hardware_address =>  entry.mac.uint48_to_s,
         :src_protocol_address =>  request.dst_protocol_address,
         :dst_hardware_address =>  request.src_hardware_address,
         :dst_protocol_address =>  request.src_protocol_address,
