@@ -23,9 +23,7 @@ void run_reduce()
     memset(inmsg, 0, MESSAGE_SIZE);
     memset(outmsg, 0, MESSAGE_SIZE);
 
-    MPI_Reduce(inmsg, outmsg, count, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
-
-    MPI_Barrier(MPI_COMM_WORLD);
+    MPI_Allreduce(inmsg, outmsg, count, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
 }
 
 int main(int argc,char *argv[])
