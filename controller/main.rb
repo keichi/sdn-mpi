@@ -181,7 +181,11 @@ class SDNMPIController < Controller
     src_mac = message.macsa.to_i
     dst_mac = message.macda.to_i
 
-    route = @topology.route src_mac, dst_mac, false
+    m = Mutex.new
+    route = nil
+    m.synchronize {
+      route = @topology.route src_mac, dst_mac, false
+    }
     if route.nil?
       puts "No route from #{message.macsa} to #{message.macda}"
       return
