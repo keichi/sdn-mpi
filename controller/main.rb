@@ -15,6 +15,7 @@ class SDNMPIController < Controller
     @arp_table = ArpTable.new 5
     @topology = Topology.new 5
     @reserved_routes = {}
+    @route_mutex = Mutex.new
 
     File.unlink '/tmp/sdn-mpi.sock' if File.exists? '/tmp/sdn-mpi.sock'
     @server = UNIXServer.open('/tmp/sdn-mpi.sock')
@@ -181,9 +182,8 @@ class SDNMPIController < Controller
     src_mac = message.macsa.to_i
     dst_mac = message.macda.to_i
 
-    m = Mutex.new
     route = nil
-    m.synchronize {
+    @route_mutex.synchronize {
       route = @topology.route src_mac, dst_mac, false
     }
     if route.nil?
