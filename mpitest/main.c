@@ -14,7 +14,7 @@
 #define MESSAGE_SIZE    (1024 * 1024 * 128)
 #define MESSAGE_COUNT   (32)
 #define RUN_COUNT       (10)
-#define CONTROLLER_ADDRESS  "/tmp/sdn-mpi.sock"
+#define CONTROLLER_ADDRESS          "192.168.10.30"
 #define CONTROLLER_RECV_BUF_SIZE    (1024)
 
 char inmsg[MESSAGE_SIZE];
@@ -22,8 +22,8 @@ char outmsg[MESSAGE_SIZE] = {0};
 
 void notify_controller(const char* format, ...)
 {
-    int sock, len;
-    struct sockaddr_un sa;
+    int sock;
+    struct sockaddr_in sa;
     char buf[CONTROLLER_RECV_BUF_SIZE];
     va_list arg;
 
@@ -31,16 +31,17 @@ void notify_controller(const char* format, ...)
     vsprintf(buf, format, arg);
     va_end(arg);
 
-    if ((sock = socket(AF_UNIX, SOCK_STREAM, 0)) < 0) {
-        printf("Failed to open UNIX socket.\n");
+    if ((sock = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
+        printf("Failed to open TCP socket.\n");
         exit(EXIT_FAILURE);
     }
 
-    sa.sun_family = AF_UNIX;
-    strcpy(sa.sun_path, CONTROLLER_ADDRESS);
-    len = sizeof(sa.sun_family) + strlen(sa.sun_path);
+    memset(&sa, 0, sizeof(sa));
+    sa.sin_family = AF_INET;
+    sa.sin_port = htons(2345);
+    sa.sin_addr.s_addr = inet_addr(CONTROLLER_ADDRESS);
 
-    if ((connect(sock, (struct sockaddr *)&sa, len)) < 0) {
+    if ((connect(sock, (struct sockaddr *)&sa, sizeof(struct sockaddr))) < 0) {
         printf("Failed to connect to SDN MPI controller\n");
         exit(EXIT_FAILURE);
     }
@@ -112,15 +113,15 @@ void run_send_recv()
 
     switch (rank) {
         case 0:
-        for (i = 0; i < MESSAGE_COUNT; i++) SDN_MPI_Send(outmsg, count, MPI_CHAR, 2, tag, MPI_COMM_WORLD);
+        for (i = 0; i < MESSAGE_COUNT; i++) SDN_MPI_Send(outmsg, count, MPI_CHAR, 26, tag, MPI_COMM_WORLD);
         break;
         case 1:
-        for (i = 0; i < MESSAGE_COUNT; i++) SDN_MPI_Send(outmsg, count, MPI_CHAR, 3, tag, MPI_COMM_WORLD);
+        for (i = 0; i < MESSAGE_COUNT; i++) SDN_MPI_Send(outmsg, count, MPI_CHAR, 27, tag, MPI_COMM_WORLD);
         break;
-        case 2:
+        case 26:
         for (i = 0; i < MESSAGE_COUNT; i++) MPI_Recv(inmsg, count, MPI_CHAR, 0, tag, MPI_COMM_WORLD, NULL);
         break;
-        case 3:
+        case 27:
         for (i = 0; i < MESSAGE_COUNT; i++) MPI_Recv(inmsg, count, MPI_CHAR, 1, tag, MPI_COMM_WORLD, NULL);
         break;
     }
@@ -134,6 +135,8 @@ int main(int argc,char *argv[])
     int rank;
 
     SDN_MPI_Init(&argc,&argv);
+    MPI_Barrier(MPI_COMM_WORLD);
+
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
     float start_time = (float)clock() / CLOCKS_PER_SEC;

@@ -17,8 +17,7 @@ class SDNMPIController < Controller
     @reserved_routes = {}
     @route_mutex = Mutex.new
 
-    File.unlink '/tmp/sdn-mpi.sock' if File.exists? '/tmp/sdn-mpi.sock'
-    @server = UNIXServer.open('/tmp/sdn-mpi.sock')
+    @server = TCPServer.open(2345)
 
     Thread.abort_on_exception = true
     @server_thread = Thread.new do
