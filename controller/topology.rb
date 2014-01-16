@@ -54,11 +54,6 @@ class Topology
 
   def tick
     @nodes.delete_if {|id, node| node.timed_out? @ttl}
-    @nodes.each do |id, node|
-      node.ports.delete_if do |port, link|
-        link.timed_out? @ttl if link
-      end
-    end
   end
 
   def dump
