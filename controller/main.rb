@@ -119,7 +119,7 @@ class SDNMPIController < Controller
 
   def tick_topology
     @topology.tick
-    @topology.dump
+    # @topology.dump
   end
 
   def request_port_stats
