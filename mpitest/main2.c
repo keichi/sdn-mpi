@@ -11,7 +11,7 @@
 #include <net/if.h>
 #include <netinet/in.h>
 
-#define MESSAGE_SIZE    (1024 * 1024 * 32)
+#define MESSAGE_SIZE    (1024 * 1024 * 64)
 #define RUN_COUNT       (10)
 #define CONTROLLER_ADDRESS          "192.168.10.30"
 #define CONTROLLER_RECV_BUF_SIZE    (1024)
@@ -19,16 +19,10 @@
 int inmsg[MESSAGE_SIZE];
 int outmsg[MESSAGE_SIZE] = {0};
 
-void notify_controller(const char* format, ...)
+int connect_controller()
 {
     int sock;
     struct sockaddr_in sa;
-    char buf[CONTROLLER_RECV_BUF_SIZE];
-    va_list arg;
-
-    va_start(arg, format);
-    vsprintf(buf, format, arg);
-    va_end(arg);
 
     if ((sock = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
         printf("Failed to open TCP socket.\n");
@@ -45,10 +39,26 @@ void notify_controller(const char* format, ...)
         exit(EXIT_FAILURE);
     }
 
-    write(sock, buf, strlen(buf) + 1);
+    return sock;
+}
+
+void close_controller(int sock)
+{
+    close(sock);
+}
+
+void notify_controller(int sock, const char* format, ...)
+{
+    char buf[CONTROLLER_RECV_BUF_SIZE];
+    va_list arg;
+
+    va_start(arg, format);
+    vsprintf(buf, format, arg);
+    va_end(arg);
+
+    write(sock, buf, strlen(buf));
     read(sock, buf, CONTROLLER_RECV_BUF_SIZE);
 
-    close(sock);
 }
 
 int SDN_MPI_Init(int *argc, char ***argv)
@@ -81,25 +91,31 @@ int SDN_MPI_Init(int *argc, char ***argv)
                 addrstr,
                 sizeof(addrstr)
             );
-            notify_controller("mpi_init %d %s\n", rank, addrstr);
+            int sock = connect_controller();
+            notify_controller(sock, "mpi_init %d %s\n", rank, addrstr);
+            close_controller(sock);
         }
     }
 
     freeifaddrs(ifa_list);
 }
 
-int SDN_MPI_Allreduce (void *sendbuf, void *recvbuf, int count, MPI_Datatype datatype, MPI_Op op, MPI_Comm comm)
+int SDN_MPI_Allreduce(void *sendbuf, void *recvbuf, int count, MPI_Datatype datatype, MPI_Op op, MPI_Comm comm)
 {
-    int rank, size, i, remote, distance;
+    int rank, size, i, remote, distance, sock;
     MPI_Comm_rank(comm, &rank);
     MPI_Comm_size(comm, &size);
 
     if (rank == 0) {
+        sock = connect_controller();
+
         for (distance = 1; distance < size; distance <<= 1) {
             for (i = 0; i < size; i++) {
                 remote = i ^ distance;
 
-                notify_controller("begin_mpi_send %d %d\n", i, remote);
+                if (i < remote) {
+                    notify_controller(sock, "begin_mpi_send %d %d\n", i, remote);
+                }
             }
         }
     }
@@ -111,9 +127,13 @@ int SDN_MPI_Allreduce (void *sendbuf, void *recvbuf, int count, MPI_Datatype dat
             for (i = 0; i < size; i++) {
                 remote = i ^ distance;
 
-                notify_controller("end_mpi_send %d %d\n", i, remote);
+                if (i < remote) {
+                    notify_controller(sock, "end_mpi_send %d %d\n", i, remote);
+                }
             }
         }
+
+        close_controller(sock);
     }
 }
 

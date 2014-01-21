@@ -24,92 +24,99 @@ class SDNMPIController < Controller
       while true do
         socket = @server.accept
 
-        message = socket.gets.split ' '
+        while s = socket.gets
+          message = s.split ' '
 
-        case message[0]
-        when 'mpi_init'
-          @arp_table.update_rank message[2].ip_s_to_i, message[1].to_i
-
-        when 'begin_mpi_send'
-          src = @arp_table.resolve_rank message[1].to_i
-          dst = @arp_table.resolve_rank message[2].to_i
-
-          if src and dst
-            route = @topology.route src.mac, dst.mac, true
-            if route.nil?
-              puts "no route"
-            end
-
-            cookie = (0xbabe << 16 | (message[1].to_i & 0xff) << 8) | (message[2].to_i & 0xff)
-
-            for i in 0 .. route.size - 2
-              send_flow_mod_add(
-                route[i].dst_id,
-                :match => Match.new(
-                  :in_port => route[i].dst_port,
-                  :dl_src => src.mac,
-                  :dl_dst => dst.mac
-                ),
-                :priority => 0xffff,
-                :actions => ActionOutput.new(route[i + 1].src_port),
-                :cookie => cookie
-              )
-              send_flow_mod_add(
-                route[i].dst_id,
-                :match => Match.new(
-                  :in_port => route[i + 1].src_port,
-                  :dl_src => dst.mac,
-                  :dl_dst => src.mac
-                ),
-                :priority => 0xffff,
-                :actions => ActionOutput.new(route[i].dst_port),
-                :cookie => cookie
-              )
-            end
-
-            route.each do |link|
-              link.tx_connections += 1
-              @topology.nodes[link.dst_id].ports[link.dst_port].rx_connections += 1
-            end
-            @reserved_routes[cookie] = route
-
-            # puts "Flow added #{src.ip.to_ip_s} <-> #{dst.ip.to_ip_s}"
-          else
-            puts "Rank is not registered: #{message[1].to_i} or #{message[2].to_i}"
+          case message[0]
+          when 'mpi_init'
+            @arp_table.update_rank message[2].ip_s_to_i, message[1].to_i
+          when 'begin_mpi_send'
+            begin_mpi_send message[1].to_i, message[2].to_i
+          when 'end_mpi_send'
+            end_mpi_send message[1].to_i, message[2].to_i
+          else 
+            puts "unrecoginized message: #{message}"
           end
-
-        when 'end_mpi_send'
-          src = message[1].to_i
-          dst = message[2].to_i
-          cookie = (0xbabe << 16 | (message[1].to_i & 0xff) << 8) | (message[2].to_i & 0xff)
-
-          @topology.nodes.each do |dpid, node|
-            if node.switch?
-              send_flow_mod_delete(
-                route[i].dst_id,
-                :cookie => cookie,
-                :strict => true
-              )
-            end
-          end
-
-          @reserved_routes[cookie].each do |link|
-            link.tx_connections -= 1
-            @topology.nodes[link.dst_id].ports[link.dst_port].rx_connections -= 1
-          end
-          @reserved_routes[cookie] = nil
-
-          # puts "Flow removed #{src} <-> #{dst}"
-
-        else 
-          puts "unrecoginized message: #{message[0]}"
+          socket.write 'ok\n'
         end
-
-        socket.write 'ok\n'
 
         socket.close
       end
     end
+  end
+
+  def begin_mpi_send src_rank, dst_rank
+    src = @arp_table.resolve_rank src_rank
+    dst = @arp_table.resolve_rank dst_rank
+
+    if src and dst
+      route = nil
+      @route_mutex.synchronize {
+        route = @topology.route src.mac, dst.mac, true
+      }
+      if route.nil?
+        puts "no route"
+      end
+
+      cookie = (0xbabe << 16 | (src_rank & 0xff) << 8) | (dst_rank & 0xff)
+
+      for i in 0 .. route.size - 2
+        send_flow_mod_add(
+          route[i].dst_id,
+          :match => Match.new(
+            :in_port => route[i].dst_port,
+            :dl_src => src.mac,
+            :dl_dst => dst.mac
+          ),
+          :priority => 0xffff,
+          :actions => ActionOutput.new(route[i + 1].src_port),
+          :cookie => cookie
+        )
+        send_flow_mod_add(
+          route[i].dst_id,
+          :match => Match.new(
+            :in_port => route[i + 1].src_port,
+            :dl_src => dst.mac,
+            :dl_dst => src.mac
+          ),
+          :priority => 0xffff,
+          :actions => ActionOutput.new(route[i].dst_port),
+          :cookie => cookie
+        )
+      end
+
+      route.each do |link|
+        link.tx_connections += 1
+        @topology.nodes[link.dst_id].ports[link.dst_port].rx_connections += 1
+      end
+      @reserved_routes[cookie] = route
+
+      # puts "Flow added #{src.ip.to_ip_s} <-> #{dst.ip.to_ip_s}"
+    else
+      puts "Rank is not registered: #{message[1].to_i} or #{message[2].to_i}"
+    end
+  end
+
+  def end_mpi_send src_rank, dst_rank
+    cookie = (0xbabe << 16 | (src_rank & 0xff) << 8) | (dst_rank & 0xff)
+
+    @topology.nodes.each do |dpid, node|
+      if node.switch?
+        send_flow_mod_delete(
+          dpid,
+          :cookie => cookie,
+          :strict => true
+        )
+      end
+    end
+
+    @reserved_routes[cookie].each do |link|
+      link.tx_connections -= 1
+      @topology.nodes[link.dst_id].ports[link.dst_port].rx_connections -= 1
+    end
+    @reserved_routes[cookie] = nil
+
+    # puts "Flow removed #{src} <-> #{dst}"
   end
 
   def tick_arp_table
