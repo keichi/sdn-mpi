@@ -19,6 +19,16 @@
 int inmsg[MESSAGE_SIZE];
 int outmsg[MESSAGE_SIZE] = {0};
 
+unsigned int nlpo2(register unsigned int x)
+{
+    x |= (x >> 1);
+    x |= (x >> 2);
+    x |= (x >> 4);
+    x |= (x >> 8);
+    x |= (x >> 16);
+    return  x+1;
+}
+
 int connect_controller()
 {
     int sock;
@@ -59,6 +69,37 @@ void notify_controller(int sock, const char* format, ...)
     write(sock, buf, strlen(buf));
     read(sock, buf, CONTROLLER_RECV_BUF_SIZE);
 
+}
+
+void install_allreduce_rules(int sock, int size, int begin)
+{
+    int i, distance, remote;
+    int rank_map[32];
+    int adjsize = nlpo2(size) >> 1;
+    int extra_ranks = size - adjsize;
+    char *cmd = begin ? "begin_mpi_send" : "end_mpi_send";
+
+    for (i = 0; i < size; i++) {
+        if (i < (2 * extra_ranks)) {
+            if (0 == (i % 2)) {
+                notify_controller(sock, "%s %d %d\n", cmd, i, i + 1);
+            } else {
+                rank_map[i >> 1] = i;
+            }
+        } else {
+            rank_map[i - extra_ranks] = i;
+        }
+    }
+
+    for (distance = 1; distance < adjsize; distance <<= 1) {
+        for (i = 0; i < adjsize; i++) {
+            remote = i ^ distance;
+
+            if (rank_map[i] < rank_map[remote]) {
+                notify_controller(sock, "%s %d %d\n", cmd, rank_map[i], rank_map[remote]);
+            }
+        }
+    }
 }
 
 int SDN_MPI_Init(int *argc, char ***argv)
@@ -109,29 +150,13 @@ int SDN_MPI_Allreduce(void *sendbuf, void *recvbuf, int count, MPI_Datatype data
     if (rank == 0) {
         sock = connect_controller();
 
-        for (distance = 1; distance < size; distance <<= 1) {
-            for (i = 0; i < size; i++) {
-                remote = i ^ distance;
-
-                if (i < remote) {
-                    notify_controller(sock, "begin_mpi_send %d %d\n", i, remote);
-                }
-            }
-        }
+        install_allreduce_rules(sock, size, 1);
     }
 
     MPI_Allreduce(sendbuf, recvbuf, count, datatype, op, comm);
 
     if (rank == 0) {
-        for (distance = 1; distance < size; distance <<= 1) {
-            for (i = 0; i < size; i++) {
-                remote = i ^ distance;
-
-                if (i < remote) {
-                    notify_controller(sock, "end_mpi_send %d %d\n", i, remote);
-                }
-            }
-        }
+        install_allreduce_rules(sock, size, 0);
 
         close_controller(sock);
     }
