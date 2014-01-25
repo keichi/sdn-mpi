@@ -15,7 +15,7 @@ class Topology
   end
 
   def update_node(type, id, ports)
-    if @nodes.key? id
+    if @nodes.key? id and ports.is_a? Hash and ports.empty?
       @nodes[id].update
     else
       @nodes[id] = Node.new type, id, ports
