@@ -175,9 +175,16 @@ class SDNMPIController < Controller
       return
     end
 
-    # Ad hoc.
-    # Drop IPv6 multicast packets
-    return if message.macda.to_s.start_with? '33:33:' or message.macda.broadcast?
+    # Drop IPv6 multicast, Ethernet broadcast and multicast DNS packets
+    if message.macda.to_s.start_with? '33:33:' or message.macda.broadcast? or message.macda == '01:00:5e:00:00:fb'
+      send_flow_mod_add(
+        datapath_id,
+        :match => Match.new(
+          :dl_dst => message.macda
+        )
+      )
+      return
+    end
 
     install_new_route datapath_id, message
   end
