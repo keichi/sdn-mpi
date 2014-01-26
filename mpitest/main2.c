@@ -10,14 +10,18 @@
 #include <ifaddrs.h>
 #include <net/if.h>
 #include <netinet/in.h>
+#include <arpa/inet.h>
 
-#define MESSAGE_SIZE    (1024 * 1024 * 64)
-#define RUN_COUNT       (10)
 #define CONTROLLER_ADDRESS          "192.168.10.30"
 #define CONTROLLER_RECV_BUF_SIZE    (1024)
+#define PORT_NUMBER                 (2345)
 
-int inmsg[MESSAGE_SIZE];
-int outmsg[MESSAGE_SIZE] = {0};
+
+int array_size = 1024 * 1024 * 32;
+int run_count = 10;
+int use_new_method = 0;
+int *inmsg;
+int *outmsg;
 
 unsigned int nlpo2(register unsigned int x)
 {
@@ -41,7 +45,7 @@ int connect_controller()
 
     memset(&sa, 0, sizeof(sa));
     sa.sin_family = AF_INET;
-    sa.sin_port = htons(2345);
+    sa.sin_port = htons(PORT_NUMBER);
     sa.sin_addr.s_addr = inet_addr(CONTROLLER_ADDRESS);
 
     if ((connect(sock, (struct sockaddr *)&sa, sizeof(struct sockaddr))) < 0) {
@@ -104,7 +108,7 @@ void install_allreduce_rules(int sock, int size, int begin)
 
 int SDN_MPI_Init(int *argc, char ***argv)
 {
-    MPI_Init(argc, argv);
+    int ret = MPI_Init(argc, argv);
 
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
@@ -139,11 +143,13 @@ int SDN_MPI_Init(int *argc, char ***argv)
     }
 
     freeifaddrs(ifa_list);
+
+    return ret;
 }
 
 int SDN_MPI_Allreduce(void *sendbuf, void *recvbuf, int count, MPI_Datatype datatype, MPI_Op op, MPI_Comm comm)
 {
-    int rank, size, i, remote, distance, sock;
+    int rank, size, sock, ret;
     MPI_Comm_rank(comm, &rank);
     MPI_Comm_size(comm, &size);
 
@@ -153,43 +159,69 @@ int SDN_MPI_Allreduce(void *sendbuf, void *recvbuf, int count, MPI_Datatype data
         install_allreduce_rules(sock, size, 1);
     }
 
-    MPI_Allreduce(sendbuf, recvbuf, count, datatype, op, comm);
+    ret = MPI_Allreduce(sendbuf, recvbuf, count, datatype, op, comm);
 
     if (rank == 0) {
         install_allreduce_rules(sock, size, 0);
 
         close_controller(sock);
     }
+
+    return ret;
 }
 
 void run_allreduce()
 {
-    int rank;
-    int i;
-    int tag = 1;
-    int count = sizeof(outmsg) / sizeof(int);
-    MPI_Status stat;
+    int rank, count = array_size;
 
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
-    memset(inmsg, 0, MESSAGE_SIZE);
-    memset(outmsg, 0, MESSAGE_SIZE);
+    memset(inmsg, 0, array_size * sizeof(int));
+    memset(outmsg, 0, array_size * sizeof(int));
 
-    SDN_MPI_Allreduce(inmsg, outmsg, count, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
+    if (use_new_method) {
+        SDN_MPI_Allreduce(inmsg, outmsg, count, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
+    } else {
+        MPI_Allreduce(inmsg, outmsg, count, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
+    }
 }
 
 int main(int argc,char *argv[])
 {
-    int i;
-    int rank;
+    int i, rank, result;
 
-    SDN_MPI_Init(&argc,&argv);
+    while((result = getopt(argc, argv, "ml:n:")) != -1) {
+        switch(result){
+        case 'm':
+            use_new_method = 1;
+        break;
+        case 'l':
+            array_size = atoi(optarg);
+        break;
+        case 'n':
+            run_count = atoi(optarg);
+        break;
+        default:
+        break;
+        }
+    }
+    argc -= optind;
+    argv += optind;
+
+    inmsg = (int*)calloc(array_size, sizeof(int));
+    outmsg = (int*)calloc(array_size, sizeof(int));
+
+    if (use_new_method) {
+        SDN_MPI_Init(&argc, &argv);
+    } else {
+        MPI_Init(&argc, &argv);
+    }
     MPI_Barrier(MPI_COMM_WORLD);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
     float start_time = (float)clock() / CLOCKS_PER_SEC;
     
-    for (i = 0; i < RUN_COUNT; i++) {
+    for (i = 0; i < run_count; i++) {
         run_allreduce();
     }
 
@@ -197,7 +229,7 @@ int main(int argc,char *argv[])
     float elapsed_time = end_time - start_time;
 
     if (rank == 0) {
-        printf("Runned %d times, average: %f[s]\n", RUN_COUNT, elapsed_time / RUN_COUNT);
+        printf("Runned %d times, average: %f[s]\n", run_count, elapsed_time / run_count);
     }
 
     MPI_Finalize();
