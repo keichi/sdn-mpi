@@ -11,11 +11,14 @@ class SDNMPIController < Controller
   periodic_timer_event :tick_topology, 1
   periodic_timer_event :request_port_stats, 0.2
 
+  USE_NEW_METHOD = false
+
   def start
     @arp_table = ArpTable.new 5
     @topology = Topology.new 5
     @reserved_routes = {}
     @route_mutex = Mutex.new
+    @is_first = true
 
     @server = TCPServer.open(2345)
 
@@ -186,7 +189,54 @@ class SDNMPIController < Controller
       return
     end
 
-    install_new_route datapath_id, message
+    if USE_NEW_METHOD
+      install_new_route datapath_id, message      
+    else
+      if @is_first
+        pre_install_routes
+        @is_first = false
+      end
+    end
+  end
+
+  def pre_install_routes
+    @topology.nodes.each do |id1, n1|
+      @topology.nodes.each do |id2, n2|
+        next if not n1.host? or not n2.host?
+        route = nil
+        @route_mutex.synchronize {
+          route = @topology.route id1, id2, true
+        }
+        next if route.nil?
+
+        puts "Flow add #{id1.to_mac_s} <-> #{id2.to_mac_s}"
+        for i in 0 .. route.size - 2
+          # Add flow entry
+          send_flow_mod_add(
+            route[i].dst_id,
+            :match => Match.new(
+              :in_port => route[i].dst_port,
+              :dl_src => Mac.new(id1),
+              :dl_dst => Mac.new(id2)
+            ),
+            :actions => ActionOutput.new(route[i + 1].src_port)
+          )
+          send_flow_mod_add(
+            route[i].dst_id,
+            :match => Match.new(
+              :in_port => route[i + 1].src_port,
+              :dl_src => Mac.new(id2),
+              :dl_dst => Mac.new(id1)
+            ),
+            :actions => ActionOutput.new(route[i].dst_port)
+          )
+
+          link = route[i]
+          link.tx_connections += 1
+          @topology.nodes[link.dst_id].ports[link.dst_port].rx_connections += 1
+        end
+      end
+    end
   end
 
   def install_new_route datapath_id, message
