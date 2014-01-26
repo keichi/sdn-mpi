@@ -15,7 +15,7 @@ class Topology
   end
 
   def update_node(type, id, ports)
-    if @nodes.key? id
+    if @nodes.key? id and ports.is_a? Hash and ports.empty?
       @nodes[id].update
     else
       @nodes[id] = Node.new type, id, ports
@@ -54,11 +54,6 @@ class Topology
 
   def tick
     @nodes.delete_if {|id, node| node.timed_out? @ttl}
-    @nodes.each do |id, node|
-      node.ports.delete_if do |port, link|
-        link.timed_out? @ttl if link
-      end
-    end
   end
 
   def dump

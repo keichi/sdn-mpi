@@ -57,7 +57,7 @@ def runMPI():
     # Launch MPI application
     print "Starting MPI application:"
     print "----------------------------------------"
-    net.hosts[0].cmdPrint('mpirun --machinefile ./machines ./mpitest');
+    net.hosts[0].cmdPrint('mpirun --machinefile ./machines --mca coll_tuned_priority 100 --mca coll_tuned_allreduce_algorithm 3 --mca coll_tuned_use_dynamic_rules 1 --mca coll_base_verbose 1 ./mpitest');
     print "----------------------------------------"
     print "MPI application finished."
 
